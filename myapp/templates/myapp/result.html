@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Collector</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet"
+          href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+          integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+          crossorigin="anonymous">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to right, #f8f9fa, #e0f7fa);
+            color: #333;
+        }
+
+        .container {
+            padding-top: 50px;
+            padding-bottom: 50px;
+        }
+
+        h1 {
+            font-weight: 600;
+            color: #00796b;
+        }
+
+        .btn-primary {
+            background-color: #00796b;
+            border-color: #00796b;
+        }
+
+        .btn-primary:hover {
+            background-color: #004d40;
+        }
+
+        .btn-warning:hover {
+            background-color: #ffa000;
+        }
+
+        .table {
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .form-inline .form-control,
+        .form-inline .btn {
+            margin-bottom: 10px;
+        }
+
+        .search-bar {
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 767px) {
+            .form-inline .col-md-4,
+            .form-inline .col-md-2,
+            .form-inline .col-md-6 {
+                width: 100% !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="text-center mb-4">
+        <h1>🌐 Link Collector</h1>
+        <p class="lead">Paste a website URL and get all the links from it!</p>
+    </div>
+
+    <!-- Django Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Form Section -->
+    <form class="form-inline row justify-content-center mb-4" id="scrapeForm" method="POST" action="/">
+        {% csrf_token %}
+        <div class="col-md-4">
+            <input class="form-control w-100" name="site" type="text" id="site" placeholder="Enter site address" required>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" type="submit" id="scrapeButton">Scrape</button>
+        </div>
+        <div class="col-md-2">
+            <a class="btn btn-warning w-100" href="/clear">Clear All</a>
+        </div>
+    </form>
+
+    <!-- Filter and CSV Download -->
+    <div class="row justify-content-between mb-3">
+        <div class="col-md-6">
+            <input type="text" id="searchInput" class="form-control search-bar" placeholder="🔍 Filter links...">
+        </div>
+        <div class="col-md-3 text-right">
+            <a href="/download" class="btn btn-success">⬇️ Download CSV</a>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" class="text-center mb-3" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+        <p>Scraping links, please wait...</p>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover shadow-sm" id="linkTable">
+            <thead class="thead-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody id="linkTableBody">
+                {% for link in data %}
+                    <tr>
+                        <td>{{ link.id }}</td>
+                        <td>{{ link.name|default:"(No Text)" }}</td>
+                        <td><a href="{{ link.address }}" target="_blank">{{ link.address }}</a></td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Bootstrap Modal -->
+<div class="modal fade" id="infoModal" tabindex="-1" role="dialog" aria-labelledby="infoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="infoModalLabel">Scraping Complete ✅</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                {{ data|length }} links were collected successfully!
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-success" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Error</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body" id="errorModalBody">
+                An error occurred while scraping.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-danger" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+        integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGaS2bni6tvvYjUomc+ilRH9s3"
+        crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+        integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+        crossorigin="anonymous"></script>
+
+<!-- Filter Function -->
+<script>
+    document.getElementById('searchInput').addEventListener('keyup', function () {
+        var input = this.value.toLowerCase();
+        var rows = document.querySelectorAll("#linkTable tbody tr");
+
+        rows.forEach(function (row) {
+            var rowText = row.textContent.toLowerCase();
+            row.style.display = rowText.includes(input) ? "" : "none";
+        });
+    });
+</script>
+
+<!-- Form Submission with AJAX -->
+<script>
+    $(document).ready(function() {
+        // Handle form submission
+        $('#scrapeForm').submit(function(e) {
+            e.preventDefault(); // Prevent the default form submission
+            
+            // Show loading indicator
+            $('#loadingIndicator').show();
+            
+            // Get the CSRF token
+            const csrftoken = $('[name=csrfmiddlewaretoken]').val();
+            
+            // Get the URL to scrape
+            const siteUrl = $('#site').val();
+            
+            // Perform AJAX request
+            $.ajax({
+                type: 'POST',
+                url: '/',
+                data: {
+                    'site': siteUrl,
+                    'csrfmiddlewaretoken': csrftoken
+                },
+                success: function(response) {
+                    // Hide loading indicator
+                    $('#loadingIndicator').hide();
+                    
+                    // Clear the current table data
+                    $('#linkTableBody').empty();
+                    
+                    // Check if the response is HTML (Django probably returned a rendered page)
+                    if (typeof response === 'string' && response.indexOf('<!DOCTYPE html>') !== -1) {
+                        // Parse the HTML response to extract the data
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(response, 'text/html');
+                        
+                        // Extract rows from the parsed HTML
+                        const rows = doc.querySelectorAll('#linkTable tbody tr');
+                        
+                        // Add each row to our current table
+                        rows.forEach(function(row) {
+                            $('#linkTableBody').append(row.outerHTML);
+                        });
+                        
+                        // Update the modal content with the link count
+                        const linkCount = rows.length;
+                        $('#modalBody').text(linkCount + ' links were collected successfully!');
+                        
+                        // Show the success modal
+                        $('#infoModal').modal('show');
+                    } else if (response.links) {
+                        // If the response is JSON with a links array
+                        const links = response.links;
+                        
+                        // Add each link to the table
+                        links.forEach(function(link) {
+                            const row = `<tr>
+                                <td>${link.id}</td>
+                                <td>${link.name || '(No Text)'}</td>
+                                <td><a href="${link.address}" target="_blank">${link.address}</a></td>
+                            </tr>`;
+                            $('#linkTableBody').append(row);
+                        });
+                        
+                        // Update the modal content with the link count
+                        $('#modalBody').text(links.length + ' links were collected successfully!');
+                        
+                        // Show the success modal
+                        $('#infoModal').modal('show');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    // Hide loading indicator
+                    $('#loadingIndicator').hide();
+                    
+                    // Show error modal
+                    $('#errorModalBody').text('Error scraping links: ' + error);
+                    $('#errorModal').modal('show');
+                }
+            });
+        });
+    });
+</script>
+
+<!-- Auto-open modal if data was loaded on page load -->
+{% if data %}
+<script>
+    $(document).ready(function () {
+        $('#infoModal').modal('show');
+    });
+</script>
+{% endif %}
+
+</body>
+</html>

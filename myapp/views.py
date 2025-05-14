@@ -7,7 +7,6 @@ from urllib.parse import urljoin
 from .models import Link
 import csv
 
-
 def scrape(request):
     if request.method == "POST":
         site = request.POST.get('site', '').strip()
@@ -18,8 +17,12 @@ def scrape(request):
         if not site.startswith(('http://', 'https://')):
             site = 'http://' + site
 
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+        }
+
         try:
-            page = requests.get(site)
+            page = requests.get(site, headers=headers, timeout=10)
             page.raise_for_status()
         except requests.exceptions.RequestException as e:
             return JsonResponse({'error': f"Error fetching site: {e}"})
@@ -52,11 +55,9 @@ def scrape(request):
             data = Link.objects.all()
         return render(request, 'myapp/result.html', {'data': data, 'search': search})
 
-
 def clear(request):
     Link.objects.all().delete()
     return redirect('/')
-
 
 def export_csv(request):
     response = HttpResponse(content_type='text/csv')
